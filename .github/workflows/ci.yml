@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    #最新の仮想マシンUbuntu（Linux）環境で実行する
+    runs-on: ubuntu-latest
+
+    steps:
+      #仮想マシンにリポジトリのコードをDL
+      - name: リポジトリをチェックアウト
+        uses: actions/checkout@v4
+
+      - name: JDK 21のセットアップ
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          #JDKの配布元(Eclipse Adoptium製)を指定
+          distribution: 'temurin'
+
+      #2回目以降の依存関係はキャッシュされたものを使う
+      - name: Gradleのキャッシュ
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: テストの実行
+        run: ./gradlew test
+
+      - name: テスト結果のアップロード
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: build/reports/tests/test

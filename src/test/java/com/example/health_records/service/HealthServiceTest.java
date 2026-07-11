@@ -229,6 +229,22 @@ public class HealthServiceTest {
 
     @Test
     void deleteHealth_正常系_記録が削除される() {
+        given(healthRepository.findById(1L)).willReturn(Optional.of(mayRecord));
 
+        healthService.deleteHealth(1L);
+
+        then(healthRepository).should().findById(1L);
+        then(healthRepository).should().delete(mayRecord);
+    }
+
+    @Test
+    void deleteHealth_異常系_HealthNotFoundExceptionがスローされる() {
+        given(healthRepository.findById(1L)).willReturn(Optional.empty());
+
+        assertThatThrownBy(() -> healthService.deleteHealth(1L))
+                .isInstanceOf(HealthNotFoundException.class)
+                .hasMessageContaining("記録ID");
+
+        then(healthRepository).should().findById(1L);
     }
 }

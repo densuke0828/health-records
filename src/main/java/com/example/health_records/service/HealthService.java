@@ -4,6 +4,7 @@ import com.example.health_records.dto.HealthRequest;
 import com.example.health_records.dto.HealthUpdateRequest;
 import com.example.health_records.dto.MonthlyStatsProjection;
 import com.example.health_records.entity.Health;
+import com.example.health_records.exception.HealthNotFoundException;
 import com.example.health_records.repository.HealthRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -11,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.NoSuchElementException;
 
 @Service
 @RequiredArgsConstructor
@@ -37,13 +37,14 @@ public class HealthService {
 
     public MonthlyStatsProjection getMonthlyStats(int year, int month) {
         return healthRepository.findMonthlyStats(year, month)
-                .orElseThrow(() -> new NoSuchElementException("指定した年月のデータがありません"));
+                .orElseThrow(() -> new HealthNotFoundException(
+                        year + "年" + month + "月のデータが見つかりません"));
     }
 
     @Transactional(readOnly = false)
     public Health updateHealth(Long id, HealthUpdateRequest request) {
         Health foundHealth = healthRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("指定されたデータがありません"));
+                .orElseThrow(() -> new HealthNotFoundException(id));
         foundHealth.update(request.getWeight(), request.getCondition(),
                             request.getSleepTime(), request.getMemo());
         return foundHealth;
@@ -52,7 +53,7 @@ public class HealthService {
     @Transactional(readOnly = false)
     public void deleteHealth(Long id) {
         Health foundHealth = healthRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("指定されたデータがありません"));
+                .orElseThrow(() -> new HealthNotFoundException(id));
         healthRepository.delete(foundHealth);
     }
 }

@@ -64,5 +64,4 @@ public class HealthController {
         healthService.deleteHealth(id);
         return ResponseEntity.noContent().build();
     }
-
 }

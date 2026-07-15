@@ -1,6 +1,7 @@
 package com.example.health_records;
 
 import com.example.health_records.dto.HealthRequest;
+import com.example.health_records.dto.HealthUpdateRequest;
 import com.example.health_records.entity.Health;
 import com.example.health_records.enums.Conditions;
 import com.example.health_records.repository.HealthRepository;
@@ -108,7 +109,7 @@ public class HealthIntegrationTest {
     }
 
     @Test
-    void GET_health_records_記録を絞り込み取得_両方指定() throws Exception{
+    void GET_health_records_記録を絞り込み取得_両方指定() throws Exception {
         LocalDate from = LocalDate.of(2026, 6, 1);
         LocalDate to = LocalDate.of(2026, 7, 31);
         String responseBody =
@@ -133,7 +134,7 @@ public class HealthIntegrationTest {
     }
 
     @Test
-    void GET_health_records_記録を絞り込み取得_fromのみ指定() throws Exception{
+    void GET_health_records_記録を絞り込み取得_fromのみ指定() throws Exception {
         LocalDate from = LocalDate.of(2026, 6, 1);
         String responseBody =
                 mockMvc.perform(get("/health-records")
@@ -156,7 +157,7 @@ public class HealthIntegrationTest {
     }
 
     @Test
-    void GET_health_records_記録を絞り込み取得_toのみ指定() throws Exception{
+    void GET_health_records_記録を絞り込み取得_toのみ指定() throws Exception {
         LocalDate to = LocalDate.of(2026, 6, 30);
         String responseBody =
                 mockMvc.perform(get("/health-records")
@@ -176,5 +177,82 @@ public class HealthIntegrationTest {
                 .containsExactlyInAnyOrder(
                         String.valueOf(mayRecord.getRecordDate()),
                         String.valueOf(juneRecord.getRecordDate()));
+    }
+
+    @Test
+    void GET_health_records_stats_月別の平均体重を取得() throws Exception {
+        healthRepository.save(Health.create(80.0, Conditions.BAD, 5.0,
+                "食べ過ぎた", LocalDate.of(2026, 7, 20)));
+        Integer year = 2026;
+        Integer month = 7;
+        Double avgWeight = 75.0;
+        mockMvc.perform(get("/health-records/stats")
+                                .param("year", String.valueOf(year))
+                                .param("month", String.valueOf(month)))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.year").value(year))
+                        .andExpect(jsonPath("$.month").value(month))
+                        .andExpect(jsonPath("$.avgWeight").value(avgWeight));
+    }
+
+    @Test
+    void GET_health_records_stats_異常系_404_存在しない記録() throws Exception {
+        mockMvc.perform(get("/health-records/stats")
+                        .param("year", String.valueOf(2999))
+                        .param("month", String.valueOf(4)))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string("指定された記録がありません"));
+    }
+
+    @Test
+    void PATCH_health_records_id_記録が更新される() throws Exception {
+        HealthUpdateRequest request = new HealthUpdateRequest();
+        ReflectionTestUtils.setField(request, "weight", 80.0);
+        ReflectionTestUtils.setField(request, "condition", Conditions.NORMAL);
+        ReflectionTestUtils.setField(request, "sleepTime", 9.0);
+        ReflectionTestUtils.setField(request, "memo", "疲れた");
+        String json = objectMapper.writeValueAsString(request);
+
+        mockMvc.perform(patch("/health-records/" + mayRecord.getId())
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .content(json))
+                        .andExpect(status().isOk())
+                        .andExpect(jsonPath("$.weight").value(request.getWeight()))
+                        .andExpect(jsonPath("$.condition").value(String.valueOf(request.getCondition())))
+                        .andExpect(jsonPath("$.sleepTime").value(request.getSleepTime()))
+                        .andExpect(jsonPath("$.memo").value(request.getMemo()));
+
+        Health updated = healthRepository.findById(mayRecord.getId()).orElseThrow();
+        assertThat(updated.getWeight()).isEqualTo(request.getWeight());
+        assertThat(updated.getCondition()).isEqualTo(request.getCondition());
+        assertThat(updated.getSleepTime()).isEqualTo(request.getSleepTime());
+        assertThat(updated.getMemo()).isEqualTo(request.getMemo());
+    }
+
+    @Test
+    void PATCH_health_records_id_異常系_404_存在しないid() throws Exception {
+        HealthUpdateRequest request = new HealthUpdateRequest();
+        String json = objectMapper.writeValueAsString(request);
+
+        mockMvc.perform(patch("/health-records/" + (mayRecord.getId() + 100))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string("指定された記録がありません"));
+    }
+
+    @Test
+    void DELETE_health_records_id_記録が削除される() throws Exception {
+        mockMvc.perform(delete("/health-records/" + (mayRecord.getId())))
+                .andExpect(status().isNoContent());
+
+        assertThat(healthRepository.findById(mayRecord.getId())).isEmpty();
+    }
+
+    @Test
+    void DELETE_health_records_id_異常系_404_存在しないid() throws Exception {
+        mockMvc.perform(delete("/health-records/" + (mayRecord.getId() + 100)))
+                .andExpect(status().isNotFound())
+                .andExpect(content().string("指定された記録がありません"));
     }
 }
